@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Drawing App</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Signature Drawing App</h1>
+            
+            <div class="border-2 border-gray-300 rounded-lg overflow-hidden mb-6">
+                <canvas id="signatureCanvas" class="w-full cursor-crosshair bg-white" height="300"></canvas>
+            </div>
+            
+            <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div class="space-y-4">
+                    <div>
+                        <label for="penColor" class="block text-sm font-medium text-gray-700 mb-1">Pen Color</label>
+                        <input type="color" id="penColor" value="#000000" class="h-10 w-20 border border-gray-300 rounded cursor-pointer">
+                    </div>
+                    
+                    <div>
+                        <label for="penSize" class="block text-sm font-medium text-gray-700 mb-1">Pen Size: <span id="sizeValue">3</span>px</label>
+                        <input type="range" id="penSize" min="1" max="20" value="3" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+                
+                <div class="flex flex-col space-y-3">
+                    <button id="clearButton" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors w-40">
+                        Clear Signature
+                    </button>
+                    
+                    <button id="downloadJpgButton" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors w-40">
+                        Download as JPG
+                    </button>
+                    
+                    <button id="downloadPdfButton" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors w-40">
+                        Download as PDF
+                    </button>
+                </div>
+            </div>
+            
+            <div class="text-sm text-gray-600 bg-gray-100 p-4 rounded-lg">
+                <p class="font-medium mb-2">Instructions:</p>
+                <ol class="list-decimal list-inside space-y-1">
+                    <li>Draw your signature on the canvas above.</li>
+                    <li>Use the color picker to change pen color.</li>
+                    <li>Adjust the pen size using the slider.</li>
+                    <li>Click "Clear Signature" to start over.</li>
+                    <li>Download your signature in JPG or PDF format.</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('signatureCanvas');
+            const context = canvas.getContext('2d');
+            const clearButton = document.getElementById('clearButton');
+            const downloadJpgButton = document.getElementById('downloadJpgButton');
+            const downloadPdfButton = document.getElementById('downloadPdfButton');
+            const penColor = document.getElementById('penColor');
+            const penSize = document.getElementById('penSize');
+            const sizeValue = document.getElementById('sizeValue');
+            
+            // Set canvas dimensions to match its display size
+            function resizeCanvas() {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+                
+                // Set initial canvas state
+                context.fillStyle = 'white';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+                context.strokeStyle = penColor.value;
+                context.lineWidth = penSize.value;
+            }
+            
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            
+            // Drawing functions
+            function startDrawing(e) {
+                isDrawing = true;
+                const pos = getPosition(e);
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+            
+            function stopDrawing() {
+                isDrawing = false;
+            }
+            
+            function draw(e) {
+                if (!isDrawing) return;
+                
+                const pos = getPosition(e);
+                context.beginPath();
+                context.moveTo(lastX, lastY);
+                context.lineTo(pos.x, pos.y);
+                context.stroke();
+                
+                lastX = pos.x;
+                lastY = pos.y;
+            }
+            
+            function getPosition(e) {
+                const rect = canvas.getBoundingClientRect();
+                const event = e.touches ? e.touches[0] : e;
+                return {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top
+                };
+            }
+            
+            // Event listeners for drawing
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('touchstart', startDrawing);
+            
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('touchmove', draw);
+            
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('touchend', stopDrawing);
+            canvas.addEventListener('mouseout', stopDrawing);
+            
+            // Prevent scrolling when drawing on mobile
+            canvas.addEventListener('touchmove', function(e) {
+                e.preventDefault();
+            }, { passive: false });
+            
+            // Controls functionality
+            clearButton.addEventListener('click', function() {
+                context.fillStyle = 'white';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+            });
+            
+            penColor.addEventListener('input', function() {
+                context.strokeStyle = this.value;
+            });
+            
+            penSize.addEventListener('input', function() {
+                context.lineWidth = this.value;
+                sizeValue.textContent = this.value;
+            });
+            
+            // Download functions
+            downloadJpgButton.addEventListener('click', function() {
+                const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'signature.jpg';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            });
+            
+            downloadPdfButton.addEventListener('click', function() {
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width, canvas.height);
+                pdf.save('signature.pdf');
+            });
+        });
+    </script>
+</body>
+</html>
